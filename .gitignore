@@ -19,10 +19,10 @@ venv/
 Thumbs.db
 
 # Django
-*.sqlite3
 *.log
 media/
 staticfiles/
 
 # Docker
 *.pid
+.env
