@@ -1,0 +1,43 @@
+import asyncio
+from playwright.async_api import async_playwright, TimeoutError as PWTimeout
+from asgiref.sync import sync_to_async
+from modules.load_django import setup_django
+from app.parser_app.services.save_product import save_product
+
+@sync_to_async
+def save_product_async(data, parser_tag):
+    return save_product(data, parser_tag)
+
+async def parse_via_playwright(url, page):
+    try:
+        await page.goto(url, timeout=15000)
+        title = await page.locator("CSS_OR_XPATH_FOR_TITLE").inner_text()
+        # ... інші поля
+        data = {"title": title.strip(), "link": url}
+        await save_product_async(data, "playwright")
+        print("Parsed", url)
+    except PWTimeout:
+        print("Timeout", url)
+    except Exception as e:
+        print("Error", e)
+
+async def main(urls, concurrency=5):
+    setup_django()
+    sem = asyncio.Semaphore(concurrency)
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        tasks = []
+        for url in urls:
+            page = await browser.new_page()
+            # щоб обмежити concurrency — використовуємо семафор в wrapper
+            async def worker(u, pg):
+                async with sem:
+                    await parse_via_playwright(u, pg)
+                    await pg.close()
+            tasks.append(worker(url, page))
+        await asyncio.gather(*tasks)
+        await browser.close()
+
+if __name__ == "__main__":
+    urls = ["https://brain.com.ua/ukr/..."]  # або список
+    asyncio.run(main(urls))
