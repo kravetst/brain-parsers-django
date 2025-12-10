@@ -18,6 +18,9 @@ venv/
 .DS_Store
 Thumbs.db
 
+# Results from parsers
+results/
+
 # Django
 *.log
 media/
