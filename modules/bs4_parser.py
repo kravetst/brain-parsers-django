@@ -3,30 +3,28 @@ import requests
 from bs4 import BeautifulSoup
 from pathlib import Path
 
-
 URL = "https://brain.com.ua/ukr/Mobilniy_telefon_Apple_iPhone_16_Pro_Max_256GB_Black_Titanium-p1145443.html"
-
 
 def parse_product_bs4() -> dict:
     """
-    Parse product information using BeautifulSoup and return structured data.
-    If some values are missing — return None instead.
+    Parse product information using BeautifulSoup.
+    Returns only the required fields in a compact structure.
     """
 
+    # Send request
     response = requests.get(URL, headers={
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
     })
-
     soup = BeautifulSoup(response.text, "html.parser")
 
+    # Extract JSON-LD scripts
     scripts = soup.find_all("script", type="application/ld+json")
     product_data = None
 
-    # Extract JSON-LD block with product details (sometimes list, sometimes dict)
+    # Find product JSON-LD
     for script in scripts:
         try:
             data = json.loads(script.string)
-
             if isinstance(data, list):
                 for item in data:
                     if item.get("@type") == "Product":
@@ -35,26 +33,73 @@ def parse_product_bs4() -> dict:
             elif data.get("@type") == "Product":
                 product_data = data
                 break
-
         except:
             continue
 
     if not product_data:
         return {"error": "Product JSON not found"}
 
-    # Form a result structure
+    # Extract basic fields
+    title = product_data.get("name")
+    brand = product_data.get("brand", {}).get("name")
+    sku = product_data.get("sku")
+    images = product_data.get("image", [])
+    price = product_data.get("offers", {}).get("price")
+    sale_price = product_data.get("offers", {}).get("price")  # Modify if site has discount
+    reviews_count = product_data.get("aggregateRating", {}).get("reviewCount")
+
+    # Extract description to parse color and memory
+    description = product_data.get("description", "")
+    color = None
+    memory = None
+    if description:
+        # Example: "256 Gb, чорний"
+        if "чорний" in description.lower():
+            color = "чорний"
+        elif "білий" in description.lower():
+            color = "білий"
+        elif "сірий" in description.lower():
+            color = "сірий"
+        elif "коричневий" in description.lower():
+            color = "коричневий"
+
+        import re
+        mem_match = re.search(r"(\d{1,3}\s?Gb)", description, re.IGNORECASE)
+        if mem_match:
+            memory = mem_match.group(1)
+
+    # Extract screen info and specs
+    screen_diagonal = None
+    resolution = None
+    specs = {}
+
+    specs_table = soup.select("div.product-characteristics table tr")
+    for row in specs_table:
+        try:
+            key = row.find("th").get_text(strip=True)
+            value = row.find("td").get_text(strip=True)
+            specs[key] = value
+            if "діагональ" in key.lower():
+                screen_diagonal = value
+            if "роздільна здатність" in key.lower():
+                resolution = value
+        except:
+            continue
+
+    # Build final compact dictionary
     result = {
-        "name": product_data.get("name"),
-        "price": product_data.get("offers", {}).get("price"),
-        "currency": product_data.get("offers", {}).get("priceCurrency"),
-        "in_stock": product_data.get("offers", {}).get("availability"),
-        "images": product_data.get("image", []),
-        "brand": product_data.get("brand", {}).get("name"),
-        "rating": product_data.get("aggregateRating", {}).get("ratingValue"),
-        "reviews_count": product_data.get("aggregateRating", {}).get("reviewCount"),
-        "sku": product_data.get("sku"),
-        "mpn": product_data.get("mpn"),
-        "description": product_data.get("description"),
+        "title": title,
+        "brand": brand,
+        "color": color,
+        "memory": memory,
+        "price": price,
+        "sale_price": sale_price,
+        "images": images,
+        "sku": sku,
+        "reviews_count": reviews_count,
+        "screen_diagonal": screen_diagonal,
+        "resolution": resolution,
+        "specs": specs,
         "link": URL,
     }
 
@@ -72,7 +117,7 @@ def save_to_json(data: dict):
 
     file_path = results_dir / "bs4_products.json"
 
-    # If file exists — load and append, else create with array
+    # Load existing file or create new
     if file_path.exists():
         with open(file_path, "r", encoding="utf-8") as file:
             saved = json.load(file)
