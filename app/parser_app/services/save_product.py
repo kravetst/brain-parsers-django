@@ -1,14 +1,22 @@
-from app.parser_app.models import Product
 from django.db import IntegrityError
+from app.parser_app.models import Product
+
 
 def save_product(data: dict, parser_tag: str):
-    # choosing a key for uniqueness
-    key = {}
-    if data.get("sku"):
-        key = {"sku": data["sku"]}
-    else:
-        key = {"link": data.get("link")}
+    """
+    Save or update product in database.
+    Uniqueness priority: SKU -> link.
+    Returns tuple: (product_instance, is_created)
+    """
 
+    # Required data validation
+    if not data.get("title") or not data.get("link"):
+        raise ValueError("Product title and link are required fields")
+
+    # Determine unique identifier
+    lookup = {"sku": data["sku"]} if data.get("sku") else {"link": data.get("link")}
+
+    # Prepare default update values
     defaults = {
         "title": data.get("title"),
         "brand": data.get("brand"),
@@ -23,11 +31,17 @@ def save_product(data: dict, parser_tag: str):
         "specs": data.get("specs") or {},
         "raw_jsonld": data.get("raw_jsonld"),
         "link": data.get("link"),
-        "status": parser_tag,
+        "status": parser_tag,  # "brain", "foxtrot", "allo" etc.
     }
+
     try:
-        product, created = Product.objects.update_or_create(**key, defaults=defaults)
+        product, created = Product.objects.update_or_create(
+            **lookup,
+            defaults=defaults
+        )
         return product, created
-    except IntegrityError as e:
-        # to log or process
-        raise
+
+    except IntegrityError as exc:
+        # Better log instead of silent raise
+        print(f"[DB ERROR] Failed to save product: {exc}")
+        return None, False
