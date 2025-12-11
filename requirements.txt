@@ -1,8 +1,23 @@
+# Django
 Django==4.2.10
+
+# Database
 psycopg2-binary==2.9.9
-beautifulsoup4==4.12.2
+
+# HTTP requests
 requests==2.31.0
-selenium==4.14.0
-playwright==1.38.0
 httpx==0.24.1
+
+# Parsing
+beautifulsoup4==4.12.2
+lxml==4.9.3  # for fast and clean HTML parsing in BS4
+
+# Selenium & WebDriver
+selenium==4.14.0
+webdriver-manager==4.0.2  # automatic driver download
+
+# Playwright
+playwright==1.38.0
+
+# Environment variables
 python-dotenv==1.0.1
