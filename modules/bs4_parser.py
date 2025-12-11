@@ -15,7 +15,7 @@ def parse_product_bs4() -> dict:
     response = requests.get(URL, headers={
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
     })
-    soup = BeautifulSoup(response.text, "html.parser")
+    soup = BeautifulSoup(response.text, "lxml")
 
     # Extract JSON-LD scripts
     scripts = soup.find_all("script", type="application/ld+json")
